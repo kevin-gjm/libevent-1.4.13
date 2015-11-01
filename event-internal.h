@@ -48,7 +48,7 @@ struct eventop {
 
 struct event_base {
 	const struct eventop *evsel;
-	void *evbase;
+	void *evbase; // 用来存储IO复用返回的struct xxxxop结构体指针
 	int event_count;		/* counts number of total events *///在此event_base中注册的事件数量
 	int event_count_active;	/* counts number of active events */
 

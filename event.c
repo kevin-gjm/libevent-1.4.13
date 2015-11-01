@@ -195,7 +195,11 @@ event_base_new(void)
 	//eventops是一个指针数组，每一项都是存储有各IO复用操作函数指针的结构体
 	for (i = 0; eventops[i] && !base->evbase; i++) {
 		base->evsel = eventops[i];
-		//返回相应的op数组，并在函数中调用evsignal_init(base);函数，创建socketpair，初始化相应的内容
+		//返回相应的op结构体,
+		//在此函数中初始化op结构体，并执行IO复用相应的初始化函数 
+		//epoll -> epoll_create 创建epfd等
+		//select 只初始化op结构体即可
+		//并在函数中调用evsignal_init(base);函数，创建socketpair，初始化相应的内容(此项内容有待考究)
 		base->evbase = base->evsel->init(base);
 	}
 
@@ -759,6 +763,7 @@ event_add(struct event *ev, const struct timeval *tv)
 	if ((ev->ev_events & (EV_READ|EV_WRITE|EV_SIGNAL)) &&
 	    !(ev->ev_flags & (EVLIST_INSERTED|EVLIST_ACTIVE))) {
 		//向相应的IO模型中增加相应的事件
+		//第一个参数在epoll_add中类型为op结构体指针，其他待考证
 		res = evsel->add(evbase, ev);
 		if (res != -1)
 			//向IO复用注册成功向event队列中增加相应项目，并为flags增加INSERTED项目
