@@ -147,6 +147,7 @@ epoll_init(struct event_base *base)
 	}
 	epollop->nfds = INITIAL_NFILES;
 
+	//创建socket pair 
 	evsignal_init(base);
 
 	return (epollop);
@@ -162,6 +163,7 @@ epoll_recalc(struct event_base *base, void *arg, int max)
 		int nfds;
 
 		nfds = epollop->nfds;
+		//增大策略每一次乘以2直到到达要求为止
 		while (nfds <= max)
 			nfds <<= 1;
 
@@ -171,6 +173,7 @@ epoll_recalc(struct event_base *base, void *arg, int max)
 			return (-1);
 		}
 		epollop->fds = fds;
+		//初始化新添加的部分
 		memset(fds + epollop->nfds, 0,
 		    (nfds - epollop->nfds) * sizeof(struct evepoll));
 		epollop->nfds = nfds;
