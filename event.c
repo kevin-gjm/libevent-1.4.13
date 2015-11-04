@@ -393,7 +393,7 @@ event_process_active(struct event_base *base)
 			event_del(ev);
 		//删除相应的项目后还能继续工作，因为删除队列内容，并没有释放event的资源	
 		/* Allows deletes to work */
-		ev_ncalls是在IO复用中的event_active```函数中进行赋值的
+		//ev_ncalls是在IO复用中的event_active```函数中进行赋值的
 		ncalls = ev->ev_ncalls;
 		ev->ev_pncalls = &ncalls;
 		while (ncalls) {

@@ -56,17 +56,20 @@
 /* due to limitations in the epoll interface, we need to keep track of
  * all file descriptors outself.
  */
+//支持一个fd有两个event的情形
+//存储相应的event指针
 struct evepoll {
 	struct event *evread;
 	struct event *evwrite;
 };
 
 struct epollop {
-	struct evepoll *fds;
-	int nfds;
-	struct epoll_event *events;
+	//通过fds[fd]就可以找到相应的控制结构，新fd总是系统中最小空闲fd
+	struct evepoll *fds;//evepoll数组，数组索引就是fd大小，数组元素就是读写event
+	int nfds; //fd的个数
+	struct epoll_event *events;//用于指定事件
 	int nevents;
-	int epfd;
+	int epfd;//epoll_fd
 };
 
 static void *epoll_init	(struct event_base *);
@@ -130,7 +133,7 @@ epoll_init(struct event_base *base)
 		return (NULL);
 
 	epollop->epfd = epfd;
-
+	//将nfd初始值为32大小，nevents同样如此.相应空间也会进行申请
 	/* Initalize fields */
 	epollop->events = malloc(INITIAL_NEVENTS * sizeof(struct epoll_event));
 	if (epollop->events == NULL) {
@@ -152,7 +155,7 @@ epoll_init(struct event_base *base)
 
 	return (epollop);
 }
-
+//判断fds数组的空间是否足够，不够加倍直到满足要求
 static int
 epoll_recalc(struct event_base *base, void *arg, int max)
 {
@@ -206,7 +209,7 @@ epoll_dispatch(struct event_base *base, void *arg, struct timeval *tv)
 			event_warn("epoll_wait");
 			return (-1);
 		}
-
+		//处理信号
 		evsignal_process(base);
 		return (0);
 	} else if (base->sig.evsignal_caught) {
@@ -216,15 +219,17 @@ epoll_dispatch(struct event_base *base, void *arg, struct timeval *tv)
 	event_debug(("%s: epoll_wait reports %d", __func__, res));
 
 	for (i = 0; i < res; i++) {
+		//epoll事件
 		int what = events[i].events;
 		struct event *evread = NULL, *evwrite = NULL;
 		int fd = events[i].data.fd;
 
 		if (fd < 0 || fd >= epollop->nfds)
 			continue;
+		//查找到相应的event指针
 		evep = &epollop->fds[fd];
 
-		if (what & (EPOLLHUP|EPOLLERR)) {
+		if (what & (EPOLLHUP|EPOLLERR)) {//存在挂起或错误
 			evread = evep->evread;
 			evwrite = evep->evwrite;
 		} else {
@@ -240,18 +245,20 @@ epoll_dispatch(struct event_base *base, void *arg, struct timeval *tv)
 		if (!(evread||evwrite))
 			continue;
 
+		//向active_list中插入相应的event,设置event中的ev_res,设置ev_ncalls等
 		if (evread != NULL)
 			event_active(evread, EV_READ, 1);
 		if (evwrite != NULL)
 			event_active(evwrite, EV_WRITE, 1);
 	}
 
+	//若所有的events都触发，扩大op数组中的events数组，
 	if (res == epollop->nevents && epollop->nevents < MAX_NEVENTS) {
 		/* We used all of the event space this time.  We should
 		   be ready for more events next time. */
 		int new_nevents = epollop->nevents * 2;
 		struct epoll_event *new_events;
-
+		// realloc不会破坏原来的数据
 		new_events = realloc(epollop->events,
 		    new_nevents * sizeof(struct epoll_event));
 		if (new_events) {
@@ -271,19 +278,23 @@ epoll_add(void *arg, struct event *ev)
 	struct epoll_event epev = {0, {0}};
 	struct evepoll *evep;
 	int fd, op, events;
-
+	//signal 的添加部分，直接调用signal添加函数
 	if (ev->ev_events & EV_SIGNAL)
 		return (evsignal_add(ev));
 
 	fd = ev->ev_fd;
+	//fd总是系统中空闲的最小fd，判断fds是否够，不够扩大
 	if (fd >= epollop->nfds) {
 		/* Extent the file descriptor array as necessary */
 		if (epoll_recalc(ev->ev_base, epollop, fd) == -1)
 			return (-1);
 	}
+	//fds 和 events数组的索引是一致的都是fd
 	evep = &epollop->fds[fd];
 	op = EPOLL_CTL_ADD;
 	events = 0;
+	//若相应的fd已经添加了相应的event
+	//再次添加回覆盖evepoll中的event指针
 	if (evep->evread != NULL) {
 		events |= EPOLLIN;
 		op = EPOLL_CTL_MOD;
@@ -331,14 +342,16 @@ epoll_del(void *arg, struct event *ev)
 
 	op = EPOLL_CTL_DEL;
 	events = 0;
-
+	//删除相应fd上的相应事件
 	if (ev->ev_events & EV_READ)
 		events |= EPOLLIN;
 	if (ev->ev_events & EV_WRITE)
 		events |= EPOLLOUT;
 
 	if ((events & (EPOLLIN|EPOLLOUT)) != (EPOLLIN|EPOLLOUT)) {
+		//若fd上不同时存在EPOLLIN 和EPOLLOUT事件时
 		if ((events & EPOLLIN) && evep->evwrite != NULL) {
+			//删除read 不删除write
 			needwritedelete = 0;
 			events = EPOLLOUT;
 			op = EPOLL_CTL_MOD;
@@ -362,7 +375,7 @@ epoll_del(void *arg, struct event *ev)
 
 	return (0);
 }
-
+//释放epoll使用的资源
 static void
 epoll_dealloc(struct event_base *base, void *arg)
 {
