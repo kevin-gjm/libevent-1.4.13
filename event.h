@@ -230,7 +230,7 @@ struct event {
 	int ev_pri;		/* smaller numbers are higher priority */
 
 	void (*ev_callback)(int, short, void *arg);
-	void *ev_arg;
+	void *ev_arg; //event_set中传递的参数
 
 	int ev_res;		/* result passed to event callback *///触发的状态，若再次触发｜上，如EV_READ等字段
 	int ev_flags;//event 的状态，在插入，激活还是TIMEOUT标志相应的状态

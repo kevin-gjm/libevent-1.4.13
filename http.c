@@ -2229,6 +2229,7 @@ evhttp_handle_request(struct evhttp_request *req, void *arg)
 	}
 }
 
+// 注册在监听socket上的回调函数
 static void
 accept_socket(int fd, short what, void *arg)
 {
@@ -2236,12 +2237,13 @@ accept_socket(int fd, short what, void *arg)
 	struct sockaddr_storage ss;
 	socklen_t addrlen = sizeof(ss);
 	int nfd;
-
+	//接受新的链接
 	if ((nfd = accept(fd, (struct sockaddr *)&ss, &addrlen)) == -1) {
 		if (errno != EAGAIN && errno != EINTR)
 			event_warn("%s: bad accept", __func__);
 		return;
 	}
+	//将新接受的socket描述符设置为非阻塞方式
 	if (evutil_make_socket_nonblocking(nfd) < 0)
 		return;
 
@@ -2253,7 +2255,7 @@ evhttp_bind_socket(struct evhttp *http, const char *address, u_short port)
 {
 	int fd;
 	int res;
-
+	//绑定地址和端口
 	if ((fd = bind_socket(address, port, 1 /*reuse*/)) == -1)
 		return (-1);
 
@@ -2282,11 +2284,13 @@ evhttp_accept_socket(struct evhttp *http, int fd)
 	bound = malloc(sizeof(struct evhttp_bound_socket));
 	if (bound == NULL)
 		return (-1);
-
+	//其中的event
 	ev = &bound->bind_ev;
 
 	/* Schedule the socket for accepting */
+	//在监听socket上注册持续和读事件，回调函数是accept_socket,http是传递的arg参数
 	event_set(ev, fd, EV_READ | EV_PERSIST, accept_socket, http);
+	//将ev注册到http中的event_base中
 	EVHTTP_BASE_SET(http, ev);
 
 	res = event_add(ev, NULL);
@@ -2311,8 +2315,9 @@ evhttp_new_object(void)
 		return (NULL);
 	}
 
-	http->timeout = -1;
-
+	http->timeout = -1;//  无限期的阻塞
+	//初始化HEAD
+	//->的优先级要高于&的优先级
 	TAILQ_INIT(&http->sockets);
 	TAILQ_INIT(&http->callbacks);
 	TAILQ_INIT(&http->connections);
@@ -2337,6 +2342,7 @@ evhttp_new(struct event_base *base)
 struct evhttp *
 evhttp_start(const char *address, u_short port)
 {
+	//定义队列并初始化，设置timeout=-1
 	struct evhttp *http = evhttp_new_object();
 
 	if (evhttp_bind_socket(http, address, port) == -1) {
@@ -2536,7 +2542,9 @@ evhttp_get_request_connection(
 	struct evhttp_connection *evcon;
 	char *hostname = NULL, *portname = NULL;
 
+	//根据地址获取对方的主机信息和端口号
 	name_from_addr(sa, salen, &hostname, &portname);
+	//不能正常获取则返回
 	if (hostname == NULL || portname == NULL) {
 		if (hostname) free(hostname);
 		if (portname) free(portname);
@@ -2554,6 +2562,7 @@ evhttp_get_request_connection(
 		return (NULL);
 
 	/* associate the base if we have one*/
+	//将connection中的base赋值为http中的base
 	evhttp_connection_set_base(evcon, http->base);
 
 	evcon->flags |= EVHTTP_CON_INCOMING;
@@ -2569,6 +2578,7 @@ evhttp_associate_new_request_with_connection(struct evhttp_connection *evcon)
 {
 	struct evhttp *http = evcon->http_server;
 	struct evhttp_request *req;
+	//初始化req ;初始化req中input/output_header队列，为input/output_buf申请空间,并将callback和arg赋给req
 	if ((req = evhttp_request_new(evhttp_handle_request, http)) == NULL)
 		return (-1);
 

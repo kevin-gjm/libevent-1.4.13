@@ -201,8 +201,8 @@ struct {
 #define EVHTTP_REQ_OWN_CONNECTION	0x0001
 #define EVHTTP_PROXY_REQUEST		0x0002
 
-	struct evkeyvalq *input_headers;
-	struct evkeyvalq *output_headers;
+	struct evkeyvalq *input_headers; //客户端请求的HTTP headers
+	struct evkeyvalq *output_headers;//将要发送给客户端的
 
 	/* address of the remote host and the port connection came from */
 	char *remote_host;
@@ -219,11 +219,11 @@ struct {
 	int response_code;		/* HTTP Response code */
 	char *response_code_line;	/* Readable response */
 
-	struct evbuffer *input_buffer;	/* read data */
+	struct evbuffer *input_buffer;	/* read data */ //客户端POST的数据
 	ev_int64_t ntoread;
 	int chunked;
 
-	struct evbuffer *output_buffer;	/* outgoing post or data */
+	struct evbuffer *output_buffer;	/* outgoing post or data *///输出到客户端的数据
 
 	/* Callback */
 	void (*cb)(struct evhttp_request *, void *);

@@ -111,6 +111,8 @@ struct evhttp_bound_socket {
 };
 
 struct evhttp {
+	//define the Tail queue定义两个队列
+	//TAILQ_HEAD(name,type)
 	TAILQ_HEAD(boundq, evhttp_bound_socket) sockets;
 
 	TAILQ_HEAD(httpcbq, evhttp_cb) callbacks;
